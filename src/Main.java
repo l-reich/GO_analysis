@@ -2,7 +2,6 @@ import org.apache.commons.cli.*;
 
 public class Main {
     public static void main(String[] args) throws ParseException {
-        System.out.println("Hello, World!");
 
         Options options = new Options();
         options.addOption("obo", true, "obo file");
@@ -43,5 +42,9 @@ public class Main {
         String o = cmd.getOptionValue("o");
         int minsize = Integer.parseInt(cmd.getOptionValue("minsize"));
         int maxsize = Integer.parseInt(cmd.getOptionValue("maxsize"));
+
+        //Init parser
+        DAGHandler dagHandler = new DAGHandler(obo, root, mapping, mapGo, enrich, o, minsize, maxsize, overlap, overlapOut);
+
     }
 }
