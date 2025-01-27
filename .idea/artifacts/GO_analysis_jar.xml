@@ -1,0 +1,11 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="GO_analysis:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/GO_analysis_jar</output-path>
+    <root id="archive" name="GO_analysis.jar">
+      <element id="module-output" name="GO_analysis" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/commons-cli/commons-cli/1.9.0/commons-cli-1.9.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar" path-in-jar="/" />
+      <element id="module-source" name="GO_analysis" />
+    </root>
+  </artifact>
+</component>

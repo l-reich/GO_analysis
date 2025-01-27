@@ -5,13 +5,15 @@ import java.util.HashMap;
 
 public class OboParser {
     private String obo;
-    private String root;
+    private String rootName;
     private HashMap<String, GOEntry> dag;
+    private GOEntry rootEntry; // Store the root GOEntry
 
-    public OboParser(String obo, String root) {
+    public OboParser(String obo, String rootName) {
         this.obo = obo;
-        this.root = root;
+        this.rootName = rootName;
         this.dag = new HashMap<>();
+        this.rootEntry = null;
     }
 
     public HashMap<String, GOEntry> getDag() {
@@ -44,9 +46,15 @@ public class OboParser {
                         currentEntry = new GOEntry(id, null);
                     }
                 } else if (readMode && line.startsWith("name: ") && currentEntry != null) {
-                    currentEntry.setName(line.substring(6));
+                    String name = line.substring(6);
+                    currentEntry.setName(name);
+
+                    // Check if this entry is the root
+                    if (name.equals(rootName)) {
+                        rootEntry = currentEntry;
+                    }
                 } else if (readMode && line.startsWith("namespace: ") && currentEntry != null) {
-                    if (!line.substring(11).equals(root)) {
+                    if (!line.substring(11).equals(rootName)) {
                         currentEntry = null;
                         toBeAdded = false;
                     }
@@ -65,5 +73,10 @@ public class OboParser {
             e.printStackTrace();
         }
         return dag;
+    }
+
+    // Method to get the root GOEntry
+    public GOEntry getRootEntry() {
+        return rootEntry;
     }
 }

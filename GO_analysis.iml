@@ -8,5 +8,6 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="commons.cli" level="project" />
+    <orderEntry type="library" name="apache.commons.math3" level="project" />
   </component>
 </module>
