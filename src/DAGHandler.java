@@ -1068,7 +1068,8 @@ public class DAGHandler {
         }
 
         // If not directly related, find the LCA and calculate the combined path length
-        GOEntry lca = newFindLCA(term1, term2);
+        //GOEntry lca = newFindLCA(term1, term2);
+        GOEntry lca = newnewFindLCA(term1, term2);
         if (lca == null) {
             return Integer.MAX_VALUE; // No path exists if there's no LCA
         }
@@ -1153,4 +1154,72 @@ public class DAGHandler {
 
         return null; // No LCA found
     }
+
+    private GOEntry newnewFindLCA(GOEntry term1, GOEntry term2) {
+        // Priority queue for BFS, sorted by total distance (ascending)
+        PriorityQueue<NodeDistance> pq = new PriorityQueue<>(Comparator.comparingInt(nd -> nd.totalDistance));
+
+        // Map to track distances from term1 and term2 to each node
+        Map<GOEntry, Integer> distancesFromTerm1 = new HashMap<>();
+        Map<GOEntry, Integer> distancesFromTerm2 = new HashMap<>();
+
+        // Initialize BFS from term1
+        Queue<GOEntry> queue1 = new LinkedList<>();
+        queue1.add(term1);
+        distancesFromTerm1.put(term1, 0);
+
+        while (!queue1.isEmpty()) {
+            GOEntry current = queue1.poll();
+            int currentDistance = distancesFromTerm1.get(current);
+
+            for (GOEntry parent : current.getParents()) {
+                if (!distancesFromTerm1.containsKey(parent)) {
+                    distancesFromTerm1.put(parent, currentDistance + 1);
+                    queue1.add(parent);
+                }
+            }
+        }
+
+        // Initialize BFS from term2
+        Queue<GOEntry> queue2 = new LinkedList<>();
+        queue2.add(term2);
+        distancesFromTerm2.put(term2, 0);
+
+        while (!queue2.isEmpty()) {
+            GOEntry current = queue2.poll();
+            int currentDistance = distancesFromTerm2.get(current);
+
+            for (GOEntry parent : current.getParents()) {
+                if (!distancesFromTerm2.containsKey(parent)) {
+                    distancesFromTerm2.put(parent, currentDistance + 1);
+                    queue2.add(parent);
+                }
+            }
+        }
+
+        // Add all common ancestors to the priority queue
+        for (GOEntry ancestor : distancesFromTerm1.keySet()) {
+            if (distancesFromTerm2.containsKey(ancestor)) {
+                int distance1 = distancesFromTerm1.get(ancestor);
+                int distance2 = distancesFromTerm2.get(ancestor);
+                int totalDistance = distance1 + distance2;
+                pq.add(new NodeDistance(ancestor, totalDistance));
+            }
+        }
+
+        // Return the closest common ancestor (minimum total distance)
+        return pq.isEmpty() ? null : pq.poll().node;
+    }
+
+    // Helper class to store a node and its total distance in the priority queue
+    private static class NodeDistance {
+        GOEntry node;
+        int totalDistance;
+
+        NodeDistance(GOEntry node, int totalDistance) {
+            this.node = node;
+            this.totalDistance = totalDistance;
+        }
+    }
+
 }
