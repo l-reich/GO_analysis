@@ -1,18 +1,10 @@
 import java.io.*;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
-//import java.math.BigDecimal;
-//import java.math.MathContext;
-
 import org.apache.commons.math3.stat.inference.KolmogorovSmirnovTest;
-//import org.apache.commons.math3.distribution.HypergeometricDistribution;
-//import org.apache.commons.math3.stat.inference.KolmogorovSmirnovTest;
-
-//root is 0008150
 
 public class DAGHandler {
     private OboParser oboParser;
-    private MappingParser mappingParser;
     private String root;
     private String o;
     private int minsize;
@@ -25,8 +17,6 @@ public class DAGHandler {
     private HashSet<String> enrichGenes;
     private HashSet<String> mappingGenes;
     private HashSet<String> relevantGenes;
-    private HashSet<IntPair> overlapPairs = new HashSet<>(); // Store all pairs
-    private HashSet<IdPair> idPairs = new HashSet<>();
     HashSet<IdPair> relPairs = new HashSet<>();
     int significantGenes;
     GOEntry rootEntry;
@@ -87,29 +77,6 @@ public class DAGHandler {
         relevantGenes.retainAll(mappingGenes);
         calculateNoverlap();
 
-        int validPairsCount = 0;
-
-//        for (IdPair pair : relPairs) {
-//
-//            // Retrieve GOEntry objects for the terms
-//            GOEntry entry1 = dag.get(pair.getFirst());
-//            GOEntry entry2 = dag.get(pair.getSecond());
-//
-//            // Check if both entries exist and satisfy minsize and maxsize constraints
-//            if (entry1 != null && entry2 != null &&
-//                    entry1.getMappedGenes().size() >= minsize && entry1.getMappedGenes().size() <= maxsize &&
-//                    entry2.getMappedGenes().size() >= minsize && entry2.getMappedGenes().size() <= maxsize) {
-//                validPairsCount++;
-//            } else {
-//                // Remove the invalid pair
-//                // idPairs.remove(pair);
-//            }
-//        }
-//
-//// Print the size of the valid pairs
-//        System.out.println("j");
-//        System.out.println(validPairsCount);
-
         //calculate the number of significant genes in relevant genes
         for (String geneId : relevantGenes) {
             Gene gene = geneMap.get(geneId);
@@ -120,11 +87,10 @@ public class DAGHandler {
 
         if (!overlap) {
             calculateHgPvals();
-            //newCalculateHgPvals();
             applyBenjaminiHochbergCorrection(minsize, maxsize);
             calculateFejPvals(minsize, maxsize);
             applyFejBenjaminiHochbergCorrection(minsize, maxsize);
-            calculateKsStats(minsize, maxsize);
+            newCalculateKsStats(minsize, maxsize);
             applyKsBenjaminiHochbergCorrection(minsize, maxsize);
 
 
@@ -152,30 +118,7 @@ public class DAGHandler {
 
     public void propagateGenes() {
         if (rootEntry != null) {
-//            if (overlap) {
-//                propagateGenesFromNodeOverlap(rootEntry);
-//            } else {
             propagateGenesFromNode(rootEntry);
-            //}
-        }
-    }
-
-    private void propagateGenesFromNodeOverlap(GOEntry entry) {
-        // If the entry has children, propagate genes from them first
-        for (GOEntry child : entry.getChildren()) {
-            propagateGenesFromNode(child);
-
-            // Add all genes from the child to the current entry
-            entry.addMappedGenes(child.getMappedGenes());
-            entry.addOverlaps(child.getOverlaps());
-//            if (child.getOverlaps() != null) {
-//                for (String o : child.getOverlaps()) {
-//                    idPairs.add(new IdPair(entry.getId(), o));
-//                }
-//            }
-        }
-        for (String o : entry.getOverlaps()) {
-            idPairs.add(new IdPair(entry.getId(), o));
         }
     }
 
@@ -186,18 +129,9 @@ public class DAGHandler {
             // Add all genes from the child to the current entry
             entry.addMappedGenes(child.getMappedGenes());
             if (overlap) {
-                //relPairs.add(new IdPair(entry.getId(), child.getId()));
-                //entry.addOverlap(child.getId());
                 for (String gene : child.getMappedGenes()) {
                     geneToGoMap.computeIfAbsent(gene, k -> new ArrayList<>()).add(entry.getId());
                 }
-//                if (child.getOverlaps() != null) {
-//
-//                    for (String s : child.getOverlaps()) {
-//                        entry.addOverlap(s);
-//                        relPairs.add(new IdPair(entry.getId(), s));
-//                    }
-//                }
             }
         }
     }
@@ -243,7 +177,6 @@ public class DAGHandler {
             int significantMappedGenes = goEntry.getNoverlap(); // k: Significant genes in the GO entry
 
             double pValue = computeLogHypergeometricPval(totalGenes, totalSignificantGenes, mappedGenes, significantMappedGenes);
-            //}
             goEntry.setHgPval(pValue);
         }
     }
@@ -302,7 +235,6 @@ public class DAGHandler {
             goEntry.setFejPval(fejPval);
         }
     }
-
 
     public void applyFejBenjaminiHochbergCorrection(int minsize, int maxsize) {
         // Filter GO entries based on size constraints and create a mutable list
@@ -380,18 +312,6 @@ public class DAGHandler {
                     String[] goTerms = parts[2].split("\\|"); // Split GO terms
 
                     boolean isMapped = false;
-
-//                    for (int i = 0; i < goTerms.length; i++) {
-//                        if (dag.containsKey(goTerms[i])) {
-//                            for (int j = i + 1; j < goTerms.length; j++) {
-//                                if (dag.containsKey(goTerms[j])) {
-//                                    dag.get(goTerms[i]).addOverlap(goTerms[j]);
-//                                    dag.get(goTerms[j]).addOverlap(goTerms[i]);
-//                                    idPairs.add(new IdPair(goTerms[i], goTerms[j]));
-//                                }
-//                            }
-//                        }
-//                    }
 
                     for (String goTerm : goTerms) {
                         if (dag.containsKey(goTerm)) {
@@ -482,26 +402,6 @@ public class DAGHandler {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-        // Process the gene-to-GO map to calculate overlaps
-//        for (List<String> goTerms : geneToGoMap.values()) {
-//            // Generate all unique pairs of GO terms for the current gene
-//            for (int i = 0; i < goTerms.size(); i++) {
-//                if (!dag.containsKey(goTerms.get(i))) continue;
-//
-//                for (int j = i + 1; j < goTerms.size(); j++) {
-//                    if (!dag.containsKey(goTerms.get(j))) continue;
-//
-//                    // Add the overlap relationship to both entries
-//                    dag.get(goTerms.get(i)).addOverlap(goTerms.get(j));
-//                    dag.get(goTerms.get(j)).addOverlap(goTerms.get(i));
-//
-//                    // Add the pair to the global set
-//                    //idPairs.add(new IdPair(goTerms.get(i), goTerms.get(j)));
-//                    relPairs.add(new IdPair(goTerms.get(i), goTerms.get(j)));
-//                }
-//            }
-//        }
     }
 
 
@@ -560,13 +460,11 @@ public class DAGHandler {
                     double ksFdr = goEntry.getKsFdr(); // Placeholder (set actual value if available)
                     String shortestPathToATrue = goEntry.getShortestPathToATrue(); // Placeholder (set actual value if available)
 
-//                     Write the row
+                    //Write the row
                     writer.write(String.format(
                             "%s\t%s\t%d\t%s\t%d\t%.5e\t%.5e\t%.5e\t%.5e\t%.5f\t%.5e\t%.5e\t%s\n",
                             term, name, size, isTrue, noverlap, hgPval, hgFdr, fejPval, fejFdr, ksStat, ksPval, ksFdr, shortestPathToATrue
                     ));
-//                    writer.write(term+"\t" +shortestPathToATrue+ "\n"
-//                    );
                 }
             }
         } catch (IOException e) {
@@ -588,17 +486,6 @@ public class DAGHandler {
         return sum; // This is P(X >= k)
     }
 
-
-    // Helper to calculate log(nCr)
-    private double logCombination(int n, int r) {
-        if (r > n || r < 0) return Double.NEGATIVE_INFINITY;
-        double logResult = 0.0;
-        for (int i = 1; i <= r; i++) {
-            logResult += Math.log(n - i + 1) - Math.log(i);
-        }
-        return logResult;
-    }
-
     private double newLogCombination(int n, int r) {
         if (r > n || r < 0) return Double.NEGATIVE_INFINITY; // Invalid combination
         double logResult = 0.0;
@@ -608,7 +495,7 @@ public class DAGHandler {
         return logResult;
     }
 
-    public void calculateKsStats(int minsize, int maxsize) {
+    public void newCalculateKsStats(int minsize, int maxsize) {
         KolmogorovSmirnovTest ksTest = new KolmogorovSmirnovTest();
 
         // Collect background fold changes (from relevantGenes) for valid GO entries
@@ -620,24 +507,21 @@ public class DAGHandler {
         }
 
         // Map valid background genes to their fold-change values
-        double[] backgroundFoldChanges = relevantGenes.stream()
-                //.filter(geneMap::containsKey) // Ensure the gene exists in geneMap
-                .mapToDouble(geneId -> geneMap.get(geneId).getFoldChange())
-                .toArray();
-
         for (GOEntry goEntry : dag.values()) {
             // Skip GO entries that don't meet size constraints
             if (goEntry.getSize() < minsize || goEntry.getSize() > maxsize) {
-                //goEntry.setKsStat(0.0);
-                //goEntry.setKsPval(1.0);
                 continue;
             }
 
+            HashSet<String> goFoldChangesSet = new HashSet<>(goEntry.getEnrichedGenes());
+            //remove genes in goFoldChanges from backgroundFoldChanges
+            HashSet<String> filteredBackgroundFoldChanges = new HashSet<>(relevantGenes);
+            filteredBackgroundFoldChanges.removeAll(goFoldChangesSet);
             // Get fold changes for genes in enrichedGenes (specific to this GO term)
             double[] goFoldChanges = goEntry.getEnrichedGenes().stream()
-                    //.filter(geneMap::containsKey) // Ensure the gene exists in geneMap
                     .mapToDouble(geneId -> geneMap.get(geneId).getFoldChange())
                     .toArray();
+
             // Skip if there are no genes in the GO term
             if (goFoldChanges.length == 0) {
                 goEntry.setKsStat(0.0);
@@ -645,9 +529,14 @@ public class DAGHandler {
                 continue;
             }
 
+            //make the double array for the filtered background fold changes
+            double[] filteredBackgroundFoldChangesArray = filteredBackgroundFoldChanges.stream()
+                    .mapToDouble(geneId -> geneMap.get(geneId).getFoldChange())
+                    .toArray();
+
             // Perform the KS test
-            double ksStat = ksTest.kolmogorovSmirnovStatistic(goFoldChanges, backgroundFoldChanges);
-            double ksPval = ksTest.kolmogorovSmirnovTest(goFoldChanges, backgroundFoldChanges);
+            double ksStat = ksTest.kolmogorovSmirnovStatistic(goFoldChanges, filteredBackgroundFoldChangesArray);
+            double ksPval = ksTest.kolmogorovSmirnovTest(goFoldChanges, filteredBackgroundFoldChangesArray);
 
             // Store the results in the GO entry
             goEntry.setKsStat(ksStat);
@@ -684,80 +573,6 @@ public class DAGHandler {
         for (int i = 0; i < m; i++) {
             filteredEntries.get(i).setKsFdr(Math.min(correctedPvals[i], 1.0)); // Ensure FDR ≤ 1.0
         }
-    }
-
-    public String calculateShortestPathToTrue(GOEntry goEntry, List<GOEntry> trueEntries) {
-        // Return empty if the entry is already true
-        if (goEntry.isTrue()) {
-            return "";
-        }
-
-
-        // Return empty if no true entries are present
-        if (trueEntries.isEmpty()) {
-            return "";
-        }
-
-        // Perform BFS to find the shortest path to a true entry
-        Queue<List<GOEntry>> queue = new LinkedList<>();
-        Set<GOEntry> visited = new HashSet<>();
-
-        // Start BFS from the analyzed GO entry
-        queue.add(Collections.singletonList(goEntry));
-        visited.add(goEntry);
-
-        List<GOEntry> shortestPath = null;
-        GOEntry lca = null;
-
-        while (!queue.isEmpty()) {
-            List<GOEntry> path = queue.poll();
-            GOEntry current = path.get(path.size() - 1);
-
-            // If the current node is a true entry, we found the shortest path
-            if (current.isTrue()) {
-                shortestPath = path;
-                lca = findLCA(path, current); // Find the LCA for the path
-                break;
-            }
-
-            //Traverse neighbors (parents and children)
-            List<GOEntry> neighbors = new ArrayList<>();
-            neighbors.addAll(current.getParents());
-            neighbors.addAll(current.getChildren());
-
-            for (GOEntry neighbor : neighbors) {
-                if (!visited.contains(neighbor)) {
-                    visited.add(neighbor);
-
-                    // Create a new path with the neighbor added
-                    List<GOEntry> newPath = new ArrayList<>(path);
-                    newPath.add(neighbor);
-
-                    // Enqueue the new path
-                    queue.add(newPath);
-                }
-            }
-        }
-
-        // If no path was found, return empty
-        if (shortestPath == null) {
-            return "";
-        }
-
-        // Format the path as a string with '|' separators and mark the LCA with '*'
-        StringBuilder result = new StringBuilder();
-        for (GOEntry entry : shortestPath) {
-            result.append(entry.getName());
-            if (entry.equals(lca)) {
-                result.append(" * ");
-            }
-            result.append("|");
-        }
-
-        // Remove trailing '|'
-        result.setLength(result.length() - 1);
-
-        return result.toString();
     }
 
     /**
@@ -812,7 +627,7 @@ public class DAGHandler {
             PathState state = queue.poll();
             List<GOEntry> path = state.path;
             Direction direction = state.direction;
-            GOEntry current = path.get(path.size() - 1);
+            GOEntry current = path.getLast();
 
             // If the current node is a true entry, we found the shortest path
             if (current.isTrue()) {
@@ -825,15 +640,11 @@ public class DAGHandler {
             List<GOEntry> neighbors = new ArrayList<>();
             if (direction == Direction.UP) {
                 // Add parents (going up)
-                for (GOEntry parent : current.getParents()) {
-                    neighbors.add(parent);
-                }
+                neighbors.addAll(current.getParents());
             }
 
             // Always add children (going down)
-            for (GOEntry child : current.getChildren()) {
-                neighbors.add(child);
-            }
+            neighbors.addAll(current.getChildren());
 
             for (GOEntry neighbor : neighbors) {
                 if (!visited.contains(neighbor)) {
@@ -897,60 +708,16 @@ public class DAGHandler {
         }
     }
 
-    private Map<String, List<GOEntry>> buildGeneToGoMap() {
-        Map<String, List<GOEntry>> geneToGoMap = new HashMap<>();
-
-        for (GOEntry goEntry : dag.values()) {
-            // Only consider entries that satisfy the size constraints
-            if (goEntry.getSize() >= minsize && goEntry.getSize() <= maxsize) {
-                for (String gene : goEntry.getMappedGenes()) {
-                    geneToGoMap.computeIfAbsent(gene, k -> new ArrayList<>()).add(goEntry);
-                }
-            }
-        }
-        return geneToGoMap;
-    }
-
     public void writeOverlapOut(String overlapOutFile) {
-        //Map<String, List<GOEntry>> geneToGoMap = buildGeneToGoMap();
-//        System.out.println("start");
-//        HashSet<String> overlapPairs = buildOverlapPairs();
-//        System.out.println(overlapPairs.size());
-        //Map<GOEntry, Map<GOEntry, Integer>> distances = precomputeShortestPathsWithConstraints();
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(overlapOutFile))) {
             // Write the header
             writer.write("term1\tterm2\tis_relative\tpath_length\tnum_overlapping\tmax_ov_percent\n");
 
-            // Store visited pairs to avoid duplicates
-            Set<String> processedPairs = new HashSet<>();
-            int count = 0;
-
-            // Iterate over each gene and its associated GO entries
-            //for (String gene : overlapPairs) {
             for (IdPair pair : relPairs) {
                 // Compare each pair of GO entries associated with the current gene
                 GOEntry term1 = dag.get(pair.getFirst());
                 GOEntry term2 = dag.get(pair.getSecond());
-//                GOEntry term1 = goEntries.get(i);
-//
-//                if (term1.getMappedGenes().size() < minsize || term1.getMappedGenes().size() > maxsize || term2.getMappedGenes().size() < minsize || term2.getMappedGenes().size() > maxsize) {
-//                    continue;
-//                }
-//
-                count++;
-                if (count % 1000 == 0) {
-                    //System.out.println(count);
-                }
-//                GOEntry term2 = goEntries.get(j);
-
-                // Skip if this pair has already been processed
-//                String pairKey = term1.getId() + "-" + term2.getId();
-//                if (processedPairs.contains(pairKey)) {
-//                    continue;
-//                }
-//                processedPairs.add(pairKey);
-
                 // Calculate overlap metrics
                 int numOverlapping = calculateNumOverlapping(term1, term2);
                 if (numOverlapping == 0) {
@@ -977,15 +744,7 @@ public class DAGHandler {
     }
 
     private int calculateNumOverlapping(GOEntry term1, GOEntry term2) {
-//        Set<String> set1 = new HashSet<>(term1.getMappedGenes());
-//        Set<String> set2 = new HashSet<>(term2.getMappedGenes());
-////
-//        set1.retainAll(set2); // Keep only the intersection
         return (int) term1.getMappedGenes().stream().filter(term2.getMappedGenes()::contains).count();
-//        Set<String> set1 = new HashSet<>(term1.getMappedGenes());
-//        set1.retainAll(term2.getMappedGenes());
-////        return set1.size();
-//        return set1.size();
     }
 
     private boolean isRelative(GOEntry term1, GOEntry term2) {
@@ -1013,7 +772,6 @@ public class DAGHandler {
         return false;
     }
 
-
     private double calculateMaxOvPercent(GOEntry term1, GOEntry term2, int numOverlapping) {
         int size1 = term1.getMappedGenes().size();
         int size2 = term2.getMappedGenes().size();
@@ -1024,51 +782,8 @@ public class DAGHandler {
         return Math.max(percent1, percent2);
     }
 
-    private int calculatePathLength(GOEntry term1, GOEntry term2) {
-        Queue<GOEntry> queue = new LinkedList<>();
-        Map<GOEntry, Integer> distances = new HashMap<>();
-        queue.add(term1);
-        distances.put(term1, 0);
-
-        while (!queue.isEmpty()) {
-            GOEntry current = queue.poll();
-            int currentDistance = distances.get(current);
-
-            if (current.equals(term2)) {
-                return currentDistance;
-            }
-
-            // Traverse neighbors
-            for (GOEntry neighbor : current.getParents()) {
-                if (!distances.containsKey(neighbor)) {
-                    distances.put(neighbor, currentDistance + 1);
-                    queue.add(neighbor);
-                }
-            }
-            for (GOEntry neighbor : current.getChildren()) {
-                if (!distances.containsKey(neighbor)) {
-                    distances.put(neighbor, currentDistance + 1);
-                    queue.add(neighbor);
-                }
-            }
-        }
-
-        // Return a large number if no path exists
-        return Integer.MAX_VALUE;
-    }
-
     private int calculatePathLength(GOEntry term1, GOEntry term2, boolean isrelative) {
-        // If one is a relative of the other, use BFS for direct search
-        if (isrelative) {
-            if (isAncestor(term1, term2)) {
-                return calculatePathDown(term1, term2);
-            } else if (isAncestor(term2, term1)) {
-                return calculatePathDown(term2, term1);
-            }
-        }
 
-        // If not directly related, find the LCA and calculate the combined path length
-        //GOEntry lca = newFindLCA(term1, term2);
         GOEntry lca = newnewFindLCA(term1, term2);
         if (lca == null) {
             return Integer.MAX_VALUE; // No path exists if there's no LCA
@@ -1078,31 +793,6 @@ public class DAGHandler {
         int pathToLCA2 = calculatePathUp(term2, lca);
 
         return pathToLCA1 + pathToLCA2;
-    }
-
-    private int calculatePathDown(GOEntry ancestor, GOEntry descendant) {
-        // BFS to calculate the path length from ancestor to descendant
-        Queue<GOEntry> queue = new LinkedList<>();
-        Map<GOEntry, Integer> distances = new HashMap<>();
-        queue.add(ancestor);
-        distances.put(ancestor, 0);
-
-        while (!queue.isEmpty()) {
-            GOEntry current = queue.poll();
-            int currentDistance = distances.get(current);
-
-            if (current.equals(descendant)) {
-                return currentDistance;
-            }
-
-            for (GOEntry child : current.getChildren()) {
-                if (!distances.containsKey(child)) {
-                    distances.put(child, currentDistance + 1);
-                    queue.add(child);
-                }
-            }
-        }
-        return Integer.MAX_VALUE; // No path found
     }
 
     private int calculatePathUp(GOEntry start, GOEntry target) {
@@ -1128,31 +818,6 @@ public class DAGHandler {
             }
         }
         return Integer.MAX_VALUE; // No path found
-    }
-
-    private GOEntry newFindLCA(GOEntry term1, GOEntry term2) {
-        // Use a set to track ancestors of term1
-        Set<GOEntry> ancestorsOfTerm1 = new HashSet<>();
-        Queue<GOEntry> queue = new LinkedList<>();
-        queue.add(term1);
-
-        while (!queue.isEmpty()) {
-            GOEntry current = queue.poll();
-            ancestorsOfTerm1.add(current);
-            queue.addAll(current.getParents());
-        }
-
-        // Traverse upwards from term2 and find the first common ancestor
-        queue.add(term2);
-        while (!queue.isEmpty()) {
-            GOEntry current = queue.poll();
-            if (ancestorsOfTerm1.contains(current)) {
-                return current; // Found the LCA
-            }
-            queue.addAll(current.getParents());
-        }
-
-        return null; // No LCA found
     }
 
     private GOEntry newnewFindLCA(GOEntry term1, GOEntry term2) {
@@ -1221,5 +886,4 @@ public class DAGHandler {
             this.totalDistance = totalDistance;
         }
     }
-
 }
