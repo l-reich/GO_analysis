@@ -84,38 +84,38 @@ ggplot(data, aes(x = ks_stat, fill = namespace)) +
   geom_density(alpha = 0.5) +
   facet_wrap(~ namespace, scales = "free") +
   theme_minimal() +
-  labs(title = "Distribution of Enrichment Scores", x = "KS Statistic", y = "Density")
+  labs(x = "KS Statistic", y = "Density")
 
 ggplot(data, aes(x = ks_fdr, fill = namespace)) +
   geom_density(alpha = 0.5) +
   facet_wrap(~ namespace, scales = "free") +
   theme_minimal() +
-  labs(title = "Distribution of Adjusted P-values (FDR)", x = "KS FDR", y = "Density")
+  labs(x = "KS adjusted P-value", y = "Density")
 
 ## 2. Scatter Plots
 ggplot(data, aes(x = size, y = ks_stat, color = namespace)) +
   geom_point(alpha = 0.5) +
   facet_wrap(~ namespace, scales = "free") +
   theme_minimal() +
-  labs(title = "KS Statistic vs. Gene Set Size", x = "Gene Set Size", y = "KS Statistic")
+  labs(x = "Gene Set Size", y = "KS Statistic")
 
 ggplot(data, aes(x = size, y = ks_fdr, color = namespace)) +
   geom_point(alpha = 0.5) +
   facet_wrap(~ namespace, scales = "free") +
   theme_minimal() +
-  labs(title = "KS FDR vs. Gene Set Size", x = "Gene Set Size", y = "KS FDR")
+  labs(x = "Gene Set Size", y = "KS adjusted P-value")
 
 ## 3. Sorted Tables (Top 10 gene sets)
 for (metric in c("noverlap", "ks_stat")) {
   for (ns in unique(data$namespace)) {
-    cat("\n\nTop 5 Gene Sets by", metric, "for", ns, "\n")
-    print(data[namespace == ns][order(get(metric), decreasing = TRUE)][1:5, .(term, name, size, noverlap, ks_stat, ks_fdr)])
+    cat("\n\nTop 10 Gene Sets by", metric, "for", ns, "\n")
+    print(data[namespace == ns][order(get(metric), decreasing = TRUE)][1:10, .(term, name, size, noverlap, ks_stat, ks_fdr)])
   }
 }
 
 for (ns in unique(data$namespace)) {
-  cat("\n\nTop 5 Gene Sets by adjusted p-value for", ns, "\n")
-  print(data[namespace == ns][order(get("ks_fdr"), decreasing = FALSE)][1:5, .(term, name, size, noverlap, ks_stat, ks_fdr)])
+  cat("\n\nTop 10 Gene Sets by adjusted p-value for", ns, "\n")
+  print(data[namespace == ns][order(get("ks_fdr"), decreasing = FALSE)][1:10, .(term, name, size, noverlap, ks_stat, ks_fdr)])
 }
 
 dev.off()
